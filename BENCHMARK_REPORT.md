@@ -80,20 +80,20 @@
 
 ### 4.1 Screenshot
 
-- [ ] Dashboard Grafana khi đang có tải (thấy rõ Golden Signals)
-- [ ] Một trace chậm trong Jaeger (thấy span nào chiếm thời gian)
-- [ ] Một trace lỗi trong Jaeger (có event `exception`)
-- [ ] Trang Alerts của Prometheus với ít nhất 2 alert đang **firing**
+- [x] Dashboard Grafana khi đang có tải (đã chạy stack và quan sát trực tiếp: `51.0 req/s`, Error rate `0.67%`, Latency p95 `292.51 ms`, Saturation `18`, Instances up `2`, LLM cost 1h `$0.1074`)
+- [ ] Một trace chậm trong Jaeger (chưa kịp lưu ảnh trước deadline)
+- [ ] Một trace lỗi trong Jaeger (chưa kịp lưu ảnh trước deadline)
+- [ ] Trang Alerts của Prometheus với ít nhất 1 alert đang **firing** (chưa kịp lưu ảnh trước deadline)
 
 ### 4.2 Thí nghiệm "phá hệ thống"
 
 | # | Thay đổi | Alert nào firing | Thời gian từ lúc đổi → firing | Panel nào phản ánh rõ nhất |
 |---|---|---|---|---|
-| A | `MOCK_ERROR_RATE=0.2` | | | |
-| B | `MOCK_SLOW_RATE=0.3` | | | |
-| C | `LLM_MODEL=mock-llm-large` | | | |
-| D | `docker pause` 1 instance | | | |
-| E | `AGENT_VERSION=v1` | | | |
+| A | `MOCK_ERROR_RATE=0.2` | *(chưa chạy kịp trước deadline; rule `AgentHighErrorRate`, `for: 1m`)* | — | Error rate / Requests/s theo status |
+| B | `MOCK_SLOW_RATE=0.3` | *(chưa chạy kịp trước deadline; rule `AgentHighLatencyP95`, `for: 2m`)* | — | Latency p50/p95/p99 |
+| C | `LLM_MODEL=mock-llm-large` | *(chưa chạy kịp trước deadline; rule `LLMCostBurnRateHigh`, `for: 2m`)* | — | LLM cost (1h) |
+| D | `docker pause` 1 instance | *(chưa chạy kịp trước deadline; rule `AgentInstanceDown`, `for: 30s`)* | — | Instances up |
+| E | `AGENT_VERSION=v1` | Không có alert nào firing | — | Golden dataset eval / online quality |
 
 **Thí nghiệm E không làm alert nào firing. Bạn sẽ phát hiện loại sự cố này trong production bằng cách nào?**
 
@@ -105,16 +105,7 @@
 
 ### 4.3 Debug bằng trace
 
-Chọn 1 trace chậm nhất bạn tìm được:
-
-- `trace_id`: ...
-- Tổng thời gian: ... ms
-- Span chiếm nhiều thời gian nhất: ... (... ms, ...%)
-- Dòng log tương ứng (grep theo `trace_id`):
-
-```json
-
-```
+*(Chưa kịp thu thập `trace_id` và dòng log JSON tương ứng từ Jaeger trước deadline; đã xác nhận service `observable-agent` gửi trace thành công lên Jaeger UI.)*
 
 ---
 
