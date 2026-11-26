@@ -85,27 +85,36 @@ POST /ask:
 ## Part 3: Cloud Deployment (CP6)
 
 ### Exercise 3.1 / 3.2: Deploy agent Part 6 (`06-lab-complete/`)
-- **Nền tảng sử dụng:** [Railway / Render]
-- **Public URL:** `https://...`
+- **Nền tảng sử dụng:** Render (Docker Web Service + Render Key Value Redis)
+- **Public URL:** `https://k5-l3b-day14-nguyenminhquang-2a202603791.onrender.com`
 - **Screenshots:**
   - `screenshots/dashboard.png`
+    ![dashboard](screenshots/dashboard.png)
   - `screenshots/running.png`
+    ![running](screenshots/running.png)
   - `screenshots/test.png`
+    ![test](screenshots/test.png)
 
 **Kết quả 4 lệnh tự kiểm (CP6):**
 ```text
-[Dán output 4 mã HTTP: 200, 200, 401, 200]
+GET /health               -> 200
+GET /ready                -> 200
+POST /ask (no X-API-Key)  -> 401
+POST /ask (with X-API-Key)-> 200
 ```
 
 ### So sánh `railway.toml` và `render.yaml`
-- **Điểm khác nhau:** ...
-- **Vì sao khác nhau:** ...
+- **Điểm khác nhau:**
+  - **Định dạng & cấu trúc:** `railway.toml` dùng định dạng TOML tập trung vào từng service (`[build]` chọn `builder = "DOCKERFILE"`, `[deploy]` đặt `healthcheckPath`, `restartPolicyType`), còn `render.yaml` dùng định dạng YAML theo mô hình Blueprint (khai báo toàn bộ hạ tầng trong `services:` gồm `type: web`, `runtime: docker`, `healthCheckPath`, và có thể khai báo luôn cả `envVars` lẫn database/Redis đi kèm).
+  - **Quản lý biến môi trường & secret:** `railway.toml` không khai báo `envVars` trong file config (biến môi trường & secret được set riêng qua CLI `railway variables set` hoặc Dashboard), trong khi `render.yaml` cho phép khai báo trực tiếp danh sách `envVars` ngay trong file IaC và hỗ trợ `generateValue: true` (tự sinh secret) hoặc `sync: false` (nhập tay trên Dashboard để không lộ secret vào Git).
+- **Vì sao khác nhau:** Railway thiết kế theo hướng tối giản cấu hình per-service (chỉ định cách build/healthcheck rồi quản lý env/plugin qua CLI/Dashboard), còn Render Blueprint thiết kế theo hướng **Infrastructure-as-Code (IaC)** để có thể dựng lại toàn bộ stack (service + env + Redis) từ 1 file YAML duy nhất trong repo.
 
 ### Exercise 3.3: Cloud Run CI/CD (`03-cloud-deployment/production-cloud-run/`)
-*(Đọc `cloudbuild.yaml` và `service.yaml`, viết 3–5 dòng mô tả pipeline đi qua những bước nào)*:
-1. ...
-2. ...
-3. ...
+Pipeline trong `cloudbuild.yaml` tự động chạy qua 4 bước tuần tự khi push code lên branch `main`:
+1. **`test`:** Chạy container `python:3.11-slim`, cài dependencies từ `requirements.txt` và chạy `pytest tests/` để đảm bảo code pass test trước khi đóng gói.
+2. **`build`:** Dùng `gcr.io/cloud-builders/docker` build Docker image (tận dụng `--cache-from` từ tag `latest`) và gắn tag theo `$COMMIT_SHA` và `latest`.
+3. **`push`:** Đẩy image vừa build lên Google Container Registry (`gcr.io/$PROJECT_ID/ai-agent`).
+4. **`deploy`:** Dùng `gcloud run deploy` cập nhật service `ai-agent` lên Cloud Run (`asia-southeast1`), cấu hình scale (`min-instances=1` tránh cold start, `max-instances=10`), giới hạn CPU/RAM (`512Mi`, `1 CPU`), và lấy secret an toàn từ **Secret Manager** (`--set-secrets`) kết hợp cấu hình `service.yaml` (có `livenessProbe` `/health` và `startupProbe` `/ready`).
 
 ---
 
@@ -234,10 +243,24 @@ Total messages: 10
 
 ## Part 6: Final Project — Production-Ready Agent (CP5)
 
-Kết quả chạy `python check_production_ready.py` trong `06-lab-complete/` (đạt `PASS 12/12`):
+Kết quả chạy `python check_production_ready.py` trong `06-lab-complete/` (trên Windows — `42/42 checks passed`; riêng `SIGTERM` ngoài Docker báo ⚠️ do Windows không gửi được SIGTERM và mạng trường chặn `wsl --update` 403, còn `docker stop` trong Docker đã pass với `exit code 0, 0.9s`; image size `56 MB`):
 
 ```text
-[Dán phần "📋 Checklist Deliverable" từ output của check_production_ready.py vào đây]
+  📋 Checklist Deliverable
+     ✅ Dockerfile (multi-stage, < 500 MB)
+     ✅ docker-compose.yml (agent + redis)
+     ✅ .dockerignore
+     ✅ Health check endpoint (GET /health)
+     ✅ Readiness endpoint (GET /ready)
+     ✅ API Key authentication
+     ✅ Rate limiting
+     ✅ Cost guard
+     ✅ Config từ environment variables
+     ✅ Structured logging
+     ⚠️  Graceful shutdown
+     ✅ Public URL ready (Railway / Render config)
+----------------------------------------------------------------
+  Result: 11/12 tiêu chí đạt · 42/42 checks passed
 ```
 
 ---
@@ -248,4 +271,6 @@ Kết quả chạy `python check_production_ready.py` trong `06-lab-complete/` (
 
 | Lần | Phần | Hỏi gì | Nhận gì | Tự sửa & tự kiểm tra thế nào |
 |---|---|---|---|---|
-| 1 | ... | ... | ... | ... |
+| 1 | Part 1–5 | Hướng dẫn chạy từng checkpoint, giải thích log secret, docker, stateless, so sánh `railway.toml` vs `render.yaml`, Cloud Run CI/CD | Câu lệnh PowerShell/cmd, giải thích thiết kế và mẫu trình bày | Tự chạy lại tất cả ví dụ `01`–`05` trên máy, tự đo `docker images`, tự chạy `curl` lấy mã `401`/`200`/`429` và `test_stateless.py` |
+| 2 | Part 6 (`06-lab-complete/`) | Hướng dẫn từng bước thiết kế và hoàn thiện 12 tiêu chí (`config.py`, `auth.py`, `redis_client.py`, `rate_limiter.py`, `cost_guard.py`, `main.py`, `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `railway.toml`, `render.yaml`) | Code khung chuẩn production và giải thích từng thành phần | Tự kiểm tra `--static-only` (26/27 checks, chỉ 1 mục compose CLI trong sandbox) và deploy thật lên Render (kèm Key Value Redis), tự test 4 lệnh `200`/`200`/`401`/`200` |
+| 3 | Part 7 (CP7) | Hỗ trợ chạy eval với `PYTHONUTF8=1`, bổ sung 2 entry `KNOWLEDGE_BASE` (`security-02`, `scaling-03`) và tổng hợp số liệu từ JSON | Đã chạy lại `eval_v2_fixed.json` đạt `100% (23/23)` | Tự chạy 7 file `load_test.py` trên máy và đối chiếu toàn bộ số liệu trong `BENCHMARK_REPORT.md` với 10 file JSON trong `reports/` |
